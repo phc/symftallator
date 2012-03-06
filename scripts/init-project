@@ -1,0 +1,83 @@
+#!/bin/sh
+#───────────────────────────────────────────────────────────────────────
+#    Create symfftpd config on the fly and make links
+#
+#    USAGE:
+#				init-project SYMFONY_DIR SYMFONY_VERSION SYMFTTPD_CONFIG
+#
+#    REQUIREMENTS:
+#       php and git
+#
+#    AUTHOR:  Ludovic Vigouroux <ludo@mundoludo.fr>
+#    CREATED: Mars 2012
+#───────────────────────────────────────────────────────────────────────
+mksymlinks=mksymlinks
+symfttpd_cfg=symfttpd.conf.php
+
+#───────────────────────────────────────────────────────────────────────
+# Show usage
+#───────────────────────────────────────────────────────────────────────
+Usage () {
+	script_name=`basename $0`
+	echo "Usage: $script_name SYMFONY_DIR SYMFONY_VERSION SYMFTTPD_CONFIG SYMFTTPD_DIR"
+}
+
+#───────────────────────────────────────────────────────────────────────
+# Check program availability
+#───────────────────────────────────────────────────────────────────────
+CheckPrg () {
+  which $prg > /dev/null
+  if [ $? -ne 0 ]; then
+		echo "$prg is missing, aborting"
+		exit 1
+	fi
+}
+
+#───────────────────────────────────────────────────────────────────────
+# Main
+#───────────────────────────────────────────────────────────────────────
+# Check arguments
+if [ ${#@} != 4 ]; then
+	Usage
+	exit 2
+fi
+
+# Check program availability
+for prg in php; do
+  CheckPrg
+done
+
+# Set parameters
+symfony_path=$1
+symfony_version=$2
+symfttpd_cfg=${3}/$symfttpd_cfg
+symfttpd_path=$4
+
+# Create symfttpd config file if necessary
+[ -e $symfttpd_cfg ] || touch $symfttpd_cfg
+
+# Add php open tag to config
+grep '\?php' $symfttpd_cfg > /dev/null
+if [ $? -ne 0 ]; then
+	echo '<?php' >> $symfttpd_cfg
+fi
+
+# Add version to config
+grep '\[.want.\]' $symfttpd_cfg > /dev/null
+if [ $? -ne 0 ]; then
+	echo "\$options['want'] = '$symfony_version';" >> $symfttpd_cfg
+else
+	sed "s/\(.*want..\).*/\1 = '"$symfony_version"';/" $symfttpd_cfg > tmp
+	mv tmp $symfttpd_cfg
+fi
+# Add symfony path to config
+grep '\[.sf_path.\]\[.'$symfony_version $symfttpd_cfg > /dev/null
+if [ $? -ne 0 ]; then
+	echo "\$options['sf_path']['"$symfony_version"'] = '$symfony_path';" >> $symfttpd_cfg
+else
+	sed "s@\(.*sf_path.*'$symfony_version'.\).*@\1 = '"$symfony_path"';@" $symfttpd_cfg > tmp
+	mv tmp $symfttpd_cfg
+fi
+
+# Make links
+${symfttpd_path}/$mksymlinks
